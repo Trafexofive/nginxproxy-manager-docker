@@ -35,14 +35,14 @@ services:
       MYSQL_PASSWORD__FILE: /run/secrets/MYSQL_PWD
       MARIADB_AUTO_UPGRADE: '1'
     volumes:
-      - ./mysql:/var/lib/mysql
+      - ./.db:/var/lib/mysql
     secrets:
       - DB_ROOT_PWD
       - MYSQL_PWD
 
 secrets:
   DB_ROOT_PWD:
-    file: .secrets/db_root_pwd.txt
+    file: ./.secrets/db_root_pwd.txt
   MYSQL_PWD:
-    file: .secrets/mysql_pwd.txt
+    file: ./.secrets/mysql_pwd.txt
 
