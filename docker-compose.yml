@@ -8,21 +8,41 @@ services:
       - '80:80' # Public HTTP Port
       - '443:443' # Public HTTPS Port
       - '81:81' # Admin Web Port
+      - '21:21' # FTP Port (optional)
+    environment:
+      DB_MYSQL_HOST: "db"
+      DB_MYSQL_PORT: 3306
+      DB_MYSQL_USER: "npm"
+      DB_MYSQL_PASSWORD: "npm"
+      DB_MYSQL_NAME: "npm"
+      DISABLE_IPV6: 'true'
     volumes:
-      - ./.data:/data
-      - ./.letsencrypt:/etc/letsencrypt
-    depends-on:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+      - ./logrotate.custom:/etc/logrotate.d/nginx-proxy-manager
+    secrets:
+      - MYSQL_PWD
+    depends_on:
       - db
 
   db:
     image: 'jc21/mariadb-aria:latest'
-    restart: always
+    restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: 'npm'
-      MYSQL_DATABASE: 'npm'
-      MYSQL_USER: 'npm'
-      MYSQL_PASSWORD: 'npm'
+      MYSQL_ROOT_PASSWORD__FILE: /run/secrets/DB_ROOT_PWD
+      MYSQL_DATABASE: "npm"
+      MYSQL_USER: "npm"
+      MYSQL_PASSWORD__FILE: /run/secrets/MYSQL_PWD
       MARIADB_AUTO_UPGRADE: '1'
     volumes:
-      - ./.db:/var/lib/mysql
+      - ./mysql:/var/lib/mysql
+    secrets:
+      - DB_ROOT_PWD
+      - MYSQL_PWD
+
+secrets:
+  DB_ROOT_PWD:
+    file: .secrets/db_root_pwd.txt
+  MYSQL_PWD:
+    file: .secrets/mysql_pwd.txt
 
