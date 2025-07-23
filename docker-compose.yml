@@ -1,48 +1,74 @@
-
 services:
-  app:
-    image: 'jc21/nginx-proxy-manager:latest'
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: nginx-proxy-manager
     restart: unless-stopped
     ports:
-      # These ports are in format <host-port>:<container-port>
-      - '80:80' # Public HTTP Port
-      - '443:443' # Public HTTPS Port
-      - '81:81' # Admin Web Port
-      - '21:21' # FTP Port (optional)
+      - '80:80'         # Public HTTP Port
+      - '443:443'       # Public HTTPS Port
+      - '13003:81'      # Admin Web Port
+      # - '21:21'       # FTP Port (optional, commented out as per your original)
     environment:
-      DB_MYSQL_HOST: "db"
-      DB_MYSQL_PORT: 3306
-      DB_MYSQL_USER: "npm"
-      DB_MYSQL_PASSWORD: "npm"
-      DB_MYSQL_NAME: "npm"
       DISABLE_IPV6: 'true'
     volumes:
-      - ./data:/data
-      - ./letsencrypt:/etc/letsencrypt
-      - ./logrotate.custom:/etc/logrotate.d/nginx-proxy-manager
-    secrets:
-      - MYSQL_PWD
-    depends_on:
-      - db
+      - ./data:/data # For NPM data
+      - ./letsencrypt:/etc/letsencrypt # For NPM SSL certs
+      - ./logrotate.custom:/etc/logrotate.d/nginx-proxy-manager # For NPM logrotate
+    networks:
+      - proxy-net
 
-  db:
-    image: 'jc21/mariadb-aria:latest'
+  ddclient:
+    image: linuxserver/ddclient:latest
+    container_name: ddclient
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD__FILE: /run/secrets/DB_ROOT_PWD
-      MYSQL_DATABASE: "npm"
-      MYSQL_USER: "npm"
-      MYSQL_PASSWORD__FILE: /run/secrets/MYSQL_PWD
-      MARIADB_AUTO_UPGRADE: '1'
+      - PUID=1000 # Replace with your user's PUID
+      - PGID=1000 # Replace with your user's PGID
+      - TZ=Etc/UTC # Set your timezone, e.g., Europe/London, America/New_York
     volumes:
-      - ./.db:/var/lib/mysql
-    secrets:
-      - DB_ROOT_PWD
-      - MYSQL_PWD
+      - ./config/ddclient:/config # Mount the directory containing ddclient.conf
+    depends_on:
+      - nginx-proxy-manager
+    networks:
+      - proxy-net
 
-secrets:
-  DB_ROOT_PWD:
-    file: ./.secrets/db_root_pwd.txt
-  MYSQL_PWD:
-    file: ./.secrets/mysql_pwd.txt
+  glance:
+    image: glanceapp/glance
+    container_name: glance
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - ./config/glance/glance.yml:/app/config/glance.yml
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - '13092:80' # Change if needed
+    networks:
+      - proxy-net
+    # labels:
 
+  # filebrowser:
+  #   image: filebrowser/filebrowser:latest
+  #   container_name: filebrowser
+  #   restart: unless-stopped
+  #   environment:
+  #     - PUID=1000 # Replace with your user's PUID
+  #     - PGID=1000 # Replace with your user's PGID
+  #     - TZ=Etc/UTC # Set your timezone, e.g., Europe/London, America/New_York
+  #   volumes:
+  #     - ./filebrowser/config:/config # Configuration and database storage
+  #     - ./filebrowser/files:/srv # Directory for file storage
+  #     - /home/mlamkadm:/srv/home/:ro # Mount home directory in read-only mode
+  #   ports:
+  #     - '13093:80' # Expose FileBrowser on a unique port, adjust if needed
+  #   depends_on:
+  #     - nginx-proxy-manager
+  #   networks:
+  #     - proxy-net
+
+networks:
+  proxy-net:
+    driver: bridge
